@@ -14,8 +14,8 @@ export function Footer() {
                   <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon>
                 </svg>
               </div>
-              <span className="inline-flex items-center font-black text-xl tracking-tighter uppercase">
-                <span className="text-foreground">Octagon</span>
+              <span className="inline-flex items-center font-black text-xl tracking-wide uppercase">
+                <span className="text-foreground">CageMind</span>
                 <span className="text-premium ml-1">AI</span>
               </span>
             </Link>
@@ -70,7 +70,7 @@ export function Footer() {
           </div>
         </div>
         <div className="mt-12 pt-8 border-t flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-muted-foreground">
-          <p>© {new Date().getFullYear()} Octagon AI. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} CageMind AI. All rights reserved.</p>
           <p>
             Data sources: roster.watch, Tapology, ESPN, UFC, FanDuel.
           </p>

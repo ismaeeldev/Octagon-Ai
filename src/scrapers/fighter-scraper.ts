@@ -104,7 +104,7 @@ export class FighterScraper extends BaseScraper<ParsedFighter[]> {
     const fighters: RawFighter[] = [];
     let page = 0;
     let hasMore = true;
-    const maxPages = 60; // Safeguard to prevent infinite loops
+    const maxPages = 400; // Safeguard to prevent infinite loops
 
     while (hasMore && page < maxPages) {
       const url = `https://www.ufc.com/athletes/all?page=${page}`;
@@ -227,7 +227,7 @@ export class FighterScraper extends BaseScraper<ParsedFighter[]> {
     logger.info(`[${this.scraperName}] Upserting ${fighters.length} fighters to database in batches...`);
 
     const scrapedNames = new Set<string>();
-    const batchSize = 50;
+    const batchSize = 10;
 
     for (let i = 0; i < fighters.length; i += batchSize) {
       const batch = fighters.slice(i, i + batchSize);
@@ -267,7 +267,7 @@ export class FighterScraper extends BaseScraper<ParsedFighter[]> {
 
       try {
         logger.info(`[${this.scraperName}] Saving batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(fighters.length / batchSize)}...`);
-        await prisma.$transaction(upsertOperations, { timeout: 25000 });
+        await Promise.all(upsertOperations);
       } catch (error) {
         logger.error(`[${this.scraperName}] Failed to upsert batch starting at index ${i}`, error);
         throw error;

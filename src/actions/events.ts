@@ -14,6 +14,18 @@ export async function getEvents(isUpcoming?: boolean) {
     orderBy: {
       date: isUpcoming ? "asc" : "desc",
     },
+    include: {
+      fights: {
+        include: {
+          fighter1: true,
+          fighter2: true,
+        },
+        orderBy: {
+          isTitleFight: "desc",
+        },
+        take: 1,
+      },
+    },
   });
 
   return events;

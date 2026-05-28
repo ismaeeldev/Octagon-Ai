@@ -4,11 +4,11 @@ import { EventCard } from "@/components/events/event-card";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Events | Octagon AI",
+  title: "Events | CageMind AI",
   description: "Browse upcoming and past MMA events, view fight cards and results.",
 };
 
-export const revalidate = 3600; // Cache for 1 hour, then regenerate in background
+export const revalidate = 0; // Always fetch fresh database state
 
 export default async function EventsPage() {
   const [upcomingEvents, pastEvents] = await Promise.all([

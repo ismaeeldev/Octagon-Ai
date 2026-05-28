@@ -1,11 +1,21 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { PredictionEngine } from "@/lib/prediction-engine";
+import { scrapeAndSaveFighter } from "@/lib/fighter-scraper";
 import { logger } from "@/lib/logger";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 
 // Fetch list of fighters for the dropdown selectors
 export async function GET() {
   try {
+    const session = await getServerSession(authOptions);
+    const isPremium = session?.user?.isPremium === true;
+
+    if (!isPremium) {
+      return NextResponse.json({ error: "Premium subscription required" }, { status: 403 });
+    }
+
     const fighters = await prisma.fighter.findMany({
       where: { isActive: true },
       select: { id: true, name: true, weightClass: true },
@@ -21,6 +31,13 @@ export async function GET() {
 // Generate a hypothetical prediction for two fighters
 export async function POST(req: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    const isPremium = session?.user?.isPremium === true;
+
+    if (!isPremium) {
+      return NextResponse.json({ error: "Premium subscription required" }, { status: 403 });
+    }
+
     const { fighter1Id, fighter2Id } = await req.json();
 
     if (!fighter1Id || !fighter2Id) {
@@ -31,11 +48,38 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Cannot fight themselves" }, { status: 400 });
     }
 
-    const f1 = await prisma.fighter.findUnique({ where: { id: fighter1Id } });
-    const f2 = await prisma.fighter.findUnique({ where: { id: fighter2Id } });
+    let f1 = await prisma.fighter.findUnique({ where: { id: fighter1Id } });
+    let f2 = await prisma.fighter.findUnique({ where: { id: fighter2Id } });
 
     if (!f1 || !f2) {
       return NextResponse.json({ error: "Fighters not found" }, { status: 404 });
+    }
+
+    // Trigger on-demand scraper if stats are missing
+    const f1NeedsScrape = f1.height === null || f1.reach === null || f1.age === null;
+    const f2NeedsScrape = f2.height === null || f2.reach === null || f2.age === null;
+
+    if (f1NeedsScrape || f2NeedsScrape) {
+      const promises = [];
+      if (f1NeedsScrape) {
+        promises.push(
+          scrapeAndSaveFighter(f1.id)
+            .then(res => { if (res) f1 = res as any; })
+            .catch(err => logger.error(`On-demand scrape failed for ${f1?.name}:`, err))
+        );
+      }
+      if (f2NeedsScrape) {
+        promises.push(
+          scrapeAndSaveFighter(f2.id)
+            .then(res => { if (res) f2 = res as any; })
+            .catch(err => logger.error(`On-demand scrape failed for ${f2?.name}:`, err))
+        );
+      }
+      await Promise.all(promises);
+
+      // Re-fetch to ensure clean DB records
+      f1 = await prisma.fighter.findUnique({ where: { id: fighter1Id } }) || f1;
+      f2 = await prisma.fighter.findUnique({ where: { id: fighter2Id } }) || f2;
     }
 
     const engine = new PredictionEngine();

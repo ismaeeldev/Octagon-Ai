@@ -1,6 +1,7 @@
-import { prisma } from "./src/lib/db";
-import { PredictionEngine } from "./src/lib/prediction-engine";
-import { logger } from "./src/lib/logger";
+import "dotenv/config";
+import { prisma } from "@/lib/db";
+import { PredictionEngine } from "@/lib/prediction-engine";
+import { logger } from "@/lib/logger";
 
 async function runTest() {
   logger.info("=== Starting Prediction Engine Test ===");

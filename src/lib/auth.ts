@@ -62,10 +62,12 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.sub = user.id;
-        
-        // Fetch subscription status
+      }
+      
+      if (token.sub) {
+        // Fetch subscription status on every JWT validation to keep session fresh
         const subscription = await prisma.subscription.findUnique({
-          where: { userId: user.id },
+          where: { userId: token.sub },
         });
 
         const isPremium = 

@@ -19,7 +19,7 @@ export default function HomePage() {
             Find Your Betting Edge with AI-Driven <span className="premium-gradient-text">MMA Analytics</span>
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mb-10 leading-relaxed animate-in fade-in slide-in-from-bottom-6 duration-1000 delay-300 fill-mode-both">
-            Octagon AI provides automated live fight odds, dynamic Elo rankings, and cutting-edge predictive models for the serious fight fan and bettor.
+            CageMind AI provides automated live fight odds, dynamic Elo rankings, and cutting-edge predictive models for the serious fight fan and bettor.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto animate-in fade-in slide-in-from-bottom-6 duration-1000 delay-500 fill-mode-both">
             <Link href="/events" className="w-full sm:w-auto">

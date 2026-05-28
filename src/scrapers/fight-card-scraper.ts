@@ -12,6 +12,10 @@ export interface RawFight {
   weightClass?: string;
   isMainCard?: boolean;
   isTitleFight?: boolean;
+  winnerName?: string | null;
+  method?: string | null;
+  endingRound?: number | null;
+  endingTime?: string | null;
 }
 
 export interface ParsedFight {
@@ -21,6 +25,10 @@ export interface ParsedFight {
   weightClass: string | null;
   isMainCard: boolean;
   isTitleFight: boolean;
+  winnerName: string | null;
+  method: string | null;
+  endingRound: number | null;
+  endingTime: string | null;
 }
 
 export class FightCardScraper extends BaseScraper<ParsedFight[]> {
@@ -82,28 +90,37 @@ export class FightCardScraper extends BaseScraper<ParsedFight[]> {
   }
 
   private async saveToDatabase(fights: ParsedFight[]): Promise<void> {
-    logger.info(`[${this.scraperName}] Saving ${fights.length} fights to DB via transaction...`);
+    logger.info(`[${this.scraperName}] Saving ${fights.length} fights to DB sequentially...`);
     
-    // 1. Bulk Upsert All Fighters First
-    const fighterMap = new Map<string, string | null>();
+    // Deduplicate parsed fights by combination of fighter names
+    const uniqueFightsMap = new Map<string, ParsedFight>();
     for (const fight of fights) {
+      const key = `${fight.fighter1Name}_${fight.fighter2Name}`;
+      const reverseKey = `${fight.fighter2Name}_${fight.fighter1Name}`;
+      if (!uniqueFightsMap.has(key) && !uniqueFightsMap.has(reverseKey)) {
+        uniqueFightsMap.set(key, fight);
+      }
+    }
+    const uniqueFights = Array.from(uniqueFightsMap.values());
+    logger.info(`[${this.scraperName}] Deduplicated to ${uniqueFights.length} unique fights.`);
+
+    // 1. Upsert All Fighters first to prevent duplicates/missing constraints
+    const fighterMap = new Map<string, string | null>();
+    for (const fight of uniqueFights) {
       fighterMap.set(fight.fighter1Name, fight.weightClass);
       fighterMap.set(fight.fighter2Name, fight.weightClass);
     }
 
-    const fighterUpserts = Array.from(fighterMap.entries()).map(([name, weightClass]) => 
-      prisma.fighter.upsert({
-        where: { name },
-        update: {},
-        create: { name, weightClass }
-      })
-    );
-
-    try {
-      await prisma.$transaction(fighterUpserts);
-    } catch (error) {
-      logger.error(`[${this.scraperName}] Failed to bulk upsert fighters`, error);
-      throw error;
+    for (const [name, weightClass] of fighterMap.entries()) {
+      try {
+        await prisma.fighter.upsert({
+          where: { name },
+          update: {},
+          create: { name, weightClass }
+        });
+      } catch (error) {
+        logger.error(`[${this.scraperName}] Failed to upsert fighter: ${name}`, error);
+      }
     }
 
     // 2. Fetch all fighters to get their IDs
@@ -122,11 +139,10 @@ export class FightCardScraper extends BaseScraper<ParsedFight[]> {
       existingFights.map(f => [`${f.fighter1Id}_${f.fighter2Id}`, f.id])
     );
 
-    // 4. Bulk Update/Create Fights
-    const fightOperations = [];
+    // 4. Update/Create Fights sequentially
     let processedCount = 0;
 
-    for (const fight of fights) {
+    for (const fight of uniqueFights) {
       const f1Id = fighterIdMap.get(fight.fighter1Name);
       const f2Id = fighterIdMap.get(fight.fighter2Name);
 
@@ -135,42 +151,49 @@ export class FightCardScraper extends BaseScraper<ParsedFight[]> {
         continue;
       }
 
+      let winnerId = null;
+      if (fight.winnerName) {
+        winnerId = fighterIdMap.get(fight.winnerName) || null;
+      }
+
       const key = `${f1Id}_${f2Id}`;
       const existingFightId = existingFightMap.get(key);
 
-      if (existingFightId) {
-        fightOperations.push(
-          prisma.fight.update({
+      try {
+        if (existingFightId) {
+          await prisma.fight.update({
             where: { id: existingFightId },
             data: {
               weightClass: fight.weightClass,
-              isTitleFight: fight.isTitleFight
+              isTitleFight: fight.isTitleFight,
+              winnerId: winnerId,
+              method: fight.method,
+              endingRound: fight.endingRound,
+              endingTime: fight.endingTime,
             }
-          })
-        );
-      } else {
-        fightOperations.push(
-          prisma.fight.create({
+          });
+        } else {
+          await prisma.fight.create({
             data: {
               eventId: fight.eventId,
               fighter1Id: f1Id,
               fighter2Id: f2Id,
               weightClass: fight.weightClass,
-              isTitleFight: fight.isTitleFight
+              isTitleFight: fight.isTitleFight,
+              winnerId: winnerId,
+              method: fight.method,
+              endingRound: fight.endingRound,
+              endingTime: fight.endingTime,
             }
-          })
-        );
+          });
+        }
+        processedCount++;
+      } catch (error) {
+        logger.error(`[${this.scraperName}] Failed to save fight record: ${fight.fighter1Name} vs ${fight.fighter2Name}`, error);
       }
-      processedCount++;
     }
 
-    try {
-      await prisma.$transaction(fightOperations);
-      logger.info(`[${this.scraperName}] Successfully saved/updated ${processedCount} fights.`);
-    } catch (error) {
-      logger.error(`[${this.scraperName}] Failed to bulk save fights`, error);
-      throw error;
-    }
+    logger.info(`[${this.scraperName}] Successfully saved/updated ${processedCount} fights.`);
   }
 
   private getMockData(): RawFight[] {

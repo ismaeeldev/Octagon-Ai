@@ -1,8 +1,8 @@
 import { Container } from "@/components/layout/container";
 
 export const metadata = {
-  title: "Terms of Service | Octagon AI",
-  description: "Terms of Service for Octagon AI platform.",
+  title: "Terms of Service | CageMind AI",
+  description: "Terms of Service for CageMind AI platform.",
 };
 
 export default function TermsPage() {
@@ -20,14 +20,14 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-bold text-foreground mb-3">1. Acceptance of Terms</h2>
             <p>
-              By accessing or using the Octagon AI platform, you agree to be bound by these Terms of Service. If you disagree with any part of the terms, you may not access the service.
+              By accessing or using the CageMind AI platform, you agree to be bound by these Terms of Service. If you disagree with any part of the terms, you may not access the service.
             </p>
           </section>
 
           <section>
             <h2 className="text-2xl font-bold text-foreground mb-3">2. Description of Service</h2>
             <p>
-              Octagon AI provides MMA analytics, live odds syncing, and predictive models for informational and entertainment purposes only. We do not guarantee the accuracy of predictions or odds, and we are not a sportsbook or gambling operator.
+              CageMind AI provides MMA analytics, live odds syncing, and predictive models for informational and entertainment purposes only. We do not guarantee the accuracy of predictions or odds, and we are not a sportsbook or gambling operator.
             </p>
           </section>
 
@@ -48,7 +48,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-bold text-foreground mb-3">5. Limitation of Liability</h2>
             <p>
-              In no event shall Octagon AI, nor its directors, employees, partners, or agents, be liable for any indirect, incidental, special, consequential or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from your access to or use of or inability to access or use the Service.
+              In no event shall CageMind AI, nor its directors, employees, partners, or agents, be liable for any indirect, incidental, special, consequential or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from your access to or use of or inability to access or use the Service.
             </p>
           </section>
         </div>

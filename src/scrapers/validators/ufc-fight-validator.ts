@@ -25,6 +25,13 @@ export class UfcFightValidator {
       throw new ParsingError(`Fighter name too short: ${fighter1} vs ${fighter2}`);
     }
 
+    // Reject extremely long names or names with too many words (prevents scraping concatenated pages/tables)
+    const f1WordCount = fighter1.split(' ').length;
+    const f2WordCount = fighter2.split(' ').length;
+    if (f1WordCount > 5 || f2WordCount > 5 || fighter1.length > 45 || fighter2.length > 45) {
+      throw new ParsingError(`Fighter name format is invalid (too long or too many words): ${fighter1} vs ${fighter2}`);
+    }
+
     if (fighter1 === fighter2) {
       throw new ParsingError(`A fighter cannot fight themselves: ${fighter1}`);
     }
@@ -36,6 +43,10 @@ export class UfcFightValidator {
       weightClass: raw.weightClass ? raw.weightClass.trim() : null,
       isMainCard: raw.isMainCard || false,
       isTitleFight: raw.isTitleFight || false,
+      winnerName: raw.winnerName ? normalize(raw.winnerName) : null,
+      method: raw.method ? raw.method.trim() : null,
+      endingRound: raw.endingRound || null,
+      endingTime: raw.endingTime ? raw.endingTime.trim() : null,
     };
   }
 }

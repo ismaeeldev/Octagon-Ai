@@ -8,7 +8,7 @@ const MAX_REQUESTS_PER_MINUTE = 60;
 export default withAuth(
   function middleware(req) {
     const { nextUrl } = req;
-    
+
     // 1. Rate Limiting for API routes
     if (nextUrl.pathname.startsWith('/api/')) {
       const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
@@ -32,8 +32,8 @@ export default withAuth(
     }
 
     // 2. Auth & Premium Routing
-    const isPremiumRoute = 
-      nextUrl.pathname.startsWith('/betting') || 
+    const isPremiumRoute =
+      nextUrl.pathname.startsWith('/betting') ||
       nextUrl.pathname.startsWith('/matchup');
 
     if (isPremiumRoute) {

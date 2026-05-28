@@ -1,8 +1,8 @@
 import { Container } from "@/components/layout/container";
 
 export const metadata = {
-  title: "Privacy Policy | Octagon AI",
-  description: "Privacy Policy for Octagon AI platform.",
+  title: "Privacy Policy | CageMind AI",
+  description: "Privacy Policy for CageMind AI platform.",
 };
 
 export default function PrivacyPage() {
@@ -48,7 +48,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-2xl font-bold text-foreground mb-3">5. Contact Us</h2>
             <p>
-              If you have any questions about this Privacy Policy, please contact us at support@octagonai.app.
+              If you have any questions about this Privacy Policy, please contact us at support@cagemind.ai.
             </p>
           </section>
         </div>

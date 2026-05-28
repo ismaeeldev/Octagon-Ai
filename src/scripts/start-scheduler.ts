@@ -3,7 +3,7 @@ import { Scheduler } from "../jobs/scheduler";
 import { logger } from "../lib/logger";
 
 async function main() {
-  logger.info("Booting up Octagon AI Background Scheduler...");
+  logger.info("Booting up CageMind AI Background Scheduler...");
 
   const scheduler = new Scheduler();
 

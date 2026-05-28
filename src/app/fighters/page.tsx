@@ -74,7 +74,7 @@ async function FighterList({ query, page }: { query: string; page: number }) {
                   <div className="absolute bottom-0 w-24 h-24 bg-primary/10 rounded-full blur-xl transition-all duration-500 group-hover:bg-primary/20 group-hover:scale-125"></div>
                   <div className="absolute bottom-0 w-32 h-1 bg-gradient-to-r from-transparent via-primary/30 to-transparent rounded-full shadow-[0_0_15px_rgba(210,40,40,0.4)]"></div>
 
-                  {fighter.imageUrl ? (
+                  {fighter.imageUrl && fighter.imageUrl !== "null" && fighter.imageUrl !== "undefined" ? (
                     <img
                       src={fighter.imageUrl}
                       alt={displayName}

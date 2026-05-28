@@ -16,9 +16,9 @@ export class UfcFightParser {
     fightCards.each((i, el) => {
       const $el = $(el);
       
-      const fighter1Name = $el.find('.c-listing-fight__corner-name--red, .c-listing-fight__corner--red a, .fighter-name').first().text().trim();
-      const fighter2Name = $el.find('.c-listing-fight__corner-name--blue, .c-listing-fight__corner--blue a, .fighter-name').last().text().trim();
-      const weightClass = $el.find('.c-listing-fight__class, .weight-class').first().text().trim();
+      const fighter1Name = $el.find('.c-listing-fight__corner-name--red').text().trim().replace(/\s+/g, ' ') || $el.find('.details-content__name--red').text().trim().replace(/\s+/g, ' ');
+      const fighter2Name = $el.find('.c-listing-fight__corner-name--blue').text().trim().replace(/\s+/g, ' ') || $el.find('.details-content__name--blue').text().trim().replace(/\s+/g, ' ');
+      const weightClass = $el.find('.c-listing-fight__class-text, .c-listing-fight__class, .weight-class').first().text().trim();
       
       // Heuristic: Is it main card?
       const isMainCard = $el.closest('.main-card, #main-card, .c-listing-fight--main-card').length > 0;
@@ -26,6 +26,27 @@ export class UfcFightParser {
       const isTitleFight = $el.find('.c-listing-fight__title-bout, .title-bout').length > 0 || weightClass.toLowerCase().includes('title');
 
       if (fighter1Name && fighter2Name && fighter1Name !== fighter2Name) {
+        // Determine winner
+        const f1Won = $el.find('.c-listing-fight__corner--red .c-listing-fight__outcome--win').length > 0;
+        const f2Won = $el.find('.c-listing-fight__corner--blue .c-listing-fight__outcome--win').length > 0;
+        
+        let winnerName: string | null = null;
+        if (f1Won) winnerName = fighter1Name;
+        if (f2Won) winnerName = fighter2Name;
+
+        // Get ending details
+        let method: string | null = null;
+        let endingRound: number | null = null;
+        let endingTime: string | null = null;
+
+        $el.find('.c-listing-fight__result').each((_, resEl) => {
+          const label = $(resEl).find('.c-listing-fight__result-label').text().trim().toLowerCase();
+          const val = $(resEl).find('.c-listing-fight__result-text').text().trim();
+          if (label === 'method') method = val;
+          if (label === 'round') endingRound = parseInt(val, 10) || null;
+          if (label === 'time') endingTime = val;
+        });
+
         fights.push({
           eventId,
           fighter1Name,
@@ -33,6 +54,10 @@ export class UfcFightParser {
           weightClass: weightClass || "Catchweight",
           isMainCard,
           isTitleFight,
+          winnerName,
+          method,
+          endingRound,
+          endingTime
         });
       }
     });

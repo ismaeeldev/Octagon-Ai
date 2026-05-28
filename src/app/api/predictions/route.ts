@@ -3,11 +3,16 @@ import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { Prisma } from "@/generated/prisma";
+import { PredictionEngine } from "@/lib/prediction-engine";
 
 export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     const isPremium = session?.user?.isPremium === true;
+
+    if (!isPremium) {
+      return NextResponse.json({ error: "Premium subscription required" }, { status: 403 });
+    }
 
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get("page") || "1");
@@ -17,9 +22,59 @@ export async function GET(req: Request) {
     const take = 10;
     const skip = (page - 1) * take;
 
+    // 1. On-demand AI prediction generation for unpredicted fights of UPCOMING events ONLY
+    const unpredictedFights = await prisma.fight.findMany({
+      where: {
+        aiPrediction: null,
+        event: { isUpcoming: true }
+      },
+      include: {
+        fighter1: true,
+        fighter2: true,
+        event: true
+      },
+      take: 5 // Process a small batch to prevent API timeouts
+    });
+
+    if (unpredictedFights.length > 0) {
+      const engine = new PredictionEngine();
+      for (const fight of unpredictedFights) {
+        if (fight.fighter1 && fight.fighter2) {
+          try {
+            const prediction = await engine.generateHypotheticalPrediction(
+              fight.fighter1,
+              fight.fighter2,
+              fight.event?.date || new Date()
+            );
+
+            await prisma.fight.update({
+              where: { id: fight.id },
+              data: {
+                aiPrediction: prediction.summary,
+                aiConfidence: prediction.confidenceScore
+              }
+            });
+
+            await prisma.predictionHistory.create({
+              data: {
+                fightId: fight.id,
+                winProbFighter1: prediction.winProbabilityFighter1,
+                winProbFighter2: prediction.winProbabilityFighter2,
+                confidence: prediction.confidenceScore,
+                explanation: prediction.summary
+              }
+            });
+          } catch (err) {
+            console.error(`Failed to generate prediction for fight ${fight.id}:`, err);
+          }
+        }
+      }
+    }
+
+    // 2. Fetch predicted fights (strictly UPCOMING events ONLY)
     const where: Prisma.FightWhereInput = {
-      event: { isUpcoming: true },
-      aiPrediction: { not: null } // Only fights that have been predicted
+      aiPrediction: { not: null },
+      event: { isUpcoming: true }
     };
 
     if (search) {
@@ -30,23 +85,22 @@ export async function GET(req: Request) {
     }
 
     if (weightClass) {
-      where.weightClass = weightClass;
+      where.weightClass = { contains: weightClass, mode: "insensitive" };
     }
 
-    const [fights, totalCount] = await Promise.all([
-      prisma.fight.findMany({
-        where,
-        include: {
-          fighter1: true,
-          fighter2: true,
-          event: true
-        },
-        orderBy: { event: { date: 'asc' } },
-        take,
-        skip
-      }),
-      prisma.fight.count({ where })
-    ]);
+    const totalCount = await prisma.fight.count({ where });
+
+    const fights = await prisma.fight.findMany({
+      where,
+      include: {
+        fighter1: true,
+        fighter2: true,
+        event: true
+      },
+      orderBy: { event: { date: 'asc' } },
+      take,
+      skip
+    });
 
     // Apply Server-Side Premium Protection
     const protectedFights = fights.map(fight => {
@@ -72,3 +126,4 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Failed to load predictions" }, { status: 500 });
   }
 }
+

@@ -61,11 +61,21 @@ export async function POST(req: NextRequest) {
       payment_method_types: ["card"],
       line_items: [
         {
-          price: priceId,
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: "CageMind AI Premium Subscription",
+              description: "Access to AI fight predictions, matchup simulator, and premium analytics",
+            },
+            unit_amount: 100, // $1.00 USD (in cents)
+            recurring: {
+              interval: "month",
+            },
+          },
           quantity: 1,
         },
       ],
-      success_url: `${baseUrl}/settings/billing?success=true`,
+      success_url: `${baseUrl}/dashboard?success=true`,
       cancel_url: `${baseUrl}/pricing?canceled=true`,
       client_reference_id: session.user.id,
       metadata: {

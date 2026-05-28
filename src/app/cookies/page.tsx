@@ -1,8 +1,8 @@
 import { Container } from "@/components/layout/container";
 
 export const metadata = {
-  title: "Cookie Policy | Octagon AI",
-  description: "Cookie Policy for Octagon AI platform.",
+  title: "Cookie Policy | CageMind AI",
+  description: "Cookie Policy for CageMind AI platform.",
 };
 
 export default function CookiesPage() {
@@ -25,7 +25,7 @@ export default function CookiesPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-bold text-foreground mb-3">2. How Octagon AI Uses Cookies</h2>
+            <h2 className="text-2xl font-bold text-foreground mb-3">2. How CageMind AI Uses Cookies</h2>
             <p>
               When you use and access our platform, we may place cookie files in your web browser. We use cookies for the following purposes:
             </p>

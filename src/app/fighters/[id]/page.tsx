@@ -46,7 +46,7 @@ export default async function FighterDetailPage(props: {
               {/* Back glow */}
               <div className="absolute bottom-0 w-32 h-32 bg-primary/10 rounded-full blur-xl"></div>
               
-              {fighter.imageUrl ? (
+              {fighter.imageUrl && fighter.imageUrl !== "null" && fighter.imageUrl !== "undefined" ? (
                 <img
                   src={fighter.imageUrl}
                   alt={displayName}

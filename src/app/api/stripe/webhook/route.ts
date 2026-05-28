@@ -3,6 +3,15 @@ import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/db";
 import Stripe from "stripe";
 
+function getCurrentPeriodEnd(subscription: any): Date {
+  const seconds = subscription.current_period_end || subscription.items?.data?.[0]?.current_period_end;
+  if (!seconds) {
+    console.warn(`No current_period_end found on subscription ${subscription.id}, defaulting to 30 days from now.`);
+    return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  }
+  return new Date(seconds * 1000);
+}
+
 export async function POST(req: Request) {
   const body = await req.text();
   const signature = req.headers.get("stripe-signature");
@@ -27,8 +36,6 @@ export async function POST(req: Request) {
     return new NextResponse(`Webhook Error: ${error.message}`, { status: 400 });
   }
 
-  const session = event.data.object as Stripe.Checkout.Session;
-
   try {
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
@@ -51,22 +58,33 @@ export async function POST(req: Request) {
 
       console.log(`Processing checkout.session.completed for user ${userId}`);
 
-      await prisma.subscription.upsert({
+      const existingSubscription = await prisma.subscription.findUnique({
         where: { userId },
-        create: {
-          userId,
-          stripeSubscriptionId: subscription.id,
-          stripeCustomerId: subscription.customer as string,
-          status: subscription.status,
-          currentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
-        },
-        update: {
-          stripeSubscriptionId: subscription.id,
-          stripeCustomerId: subscription.customer as string,
-          status: subscription.status,
-          currentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
-        },
       });
+
+      const currentPeriodEnd = getCurrentPeriodEnd(subscription);
+
+      if (existingSubscription) {
+        await prisma.subscription.update({
+          where: { userId },
+          data: {
+            stripeSubscriptionId: subscription.id,
+            stripeCustomerId: subscription.customer as string,
+            status: subscription.status,
+            currentPeriodEnd,
+          },
+        });
+      } else {
+        await prisma.subscription.create({
+          data: {
+            userId,
+            stripeSubscriptionId: subscription.id,
+            stripeCustomerId: subscription.customer as string,
+            status: subscription.status,
+            currentPeriodEnd,
+          },
+        });
+      }
     }
 
     if (event.type === "invoice.payment_succeeded") {
@@ -77,12 +95,14 @@ export async function POST(req: Request) {
           invoice.subscription as string
         )) as Stripe.Subscription;
 
+        const currentPeriodEnd = getCurrentPeriodEnd(subscription);
+
         try {
           await prisma.subscription.update({
             where: { stripeSubscriptionId: subscription.id },
             data: {
               status: subscription.status,
-              currentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
+              currentPeriodEnd,
             },
           });
           console.log(`Updated subscription ${subscription.id} from invoice`);
@@ -98,13 +118,14 @@ export async function POST(req: Request) {
 
     if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
       const subscription = event.data.object as Stripe.Subscription;
+      const currentPeriodEnd = getCurrentPeriodEnd(subscription);
 
       try {
         await prisma.subscription.update({
           where: { stripeSubscriptionId: subscription.id },
           data: {
             status: subscription.status,
-            currentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
+            currentPeriodEnd,
           },
         });
         console.log(`Updated subscription ${subscription.id} from ${event.type}`);
@@ -119,7 +140,7 @@ export async function POST(req: Request) {
 
     return new NextResponse("Webhook processed", { status: 200 });
   } catch (error: any) {
-    console.error("[WEBHOOK_PROCESSING_ERROR]", error.message);
-    return new NextResponse(`Webhook Processing Error: ${error.message}`, { status: 500 });
+    console.error("[WEBHOOK_PROCESSING_ERROR]", error);
+    return new NextResponse(`Webhook Processing Error: ${error.message || error}`, { status: 500 });
   }
 }

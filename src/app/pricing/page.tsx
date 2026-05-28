@@ -23,7 +23,7 @@ export default async function PricingPage() {
     <Container className="py-20 animate-in fade-in duration-700">
       <PricingToastHandler />
       <div className="text-center mb-16 animate-in slide-in-from-bottom-8 duration-700 delay-150 fill-mode-both">
-        <Badge variant="premium" className="mb-4">Octagon AI Premium</Badge>
+        <Badge variant="premium" className="mb-4">CageMind AI Premium</Badge>
         <h1 className="text-5xl md:text-7xl font-black uppercase tracking-tighter mb-6 text-transparent bg-clip-text bg-gradient-to-br from-white via-white to-white/40 drop-shadow-sm">
           Unlock Your Edge
         </h1>
@@ -83,7 +83,7 @@ export default async function PricingPage() {
           <CardHeader className="bg-muted/10 pb-8 relative z-10">
             <CardTitle className="text-2xl font-black uppercase tracking-tight text-premium">Premium</CardTitle>
             <CardDescription className="text-base mt-2">The ultimate toolkit for serious bettors.</CardDescription>
-            <div className="mt-6 font-mono text-4xl font-black text-foreground">$15<span className="text-lg text-muted-foreground font-sans font-medium">/mo</span></div>
+            <div className="mt-6 font-mono text-4xl font-black text-foreground">$1<span className="text-lg text-muted-foreground font-sans font-medium">/mo</span></div>
           </CardHeader>
           <CardContent className="pt-8 flex-1 relative z-10">
             <ul className="space-y-4">

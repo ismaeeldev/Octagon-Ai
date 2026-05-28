@@ -7,6 +7,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: '/',
       disallow: ['/api/', '/admin/'], // Protect APIs and admin endpoints from crawlers
     },
-    sitemap: 'https://octagon.ai/sitemap.xml',
+    sitemap: 'https://cagemind.ai/sitemap.xml',
   };
 }

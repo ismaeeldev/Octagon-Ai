@@ -47,7 +47,7 @@ export default function RegisterPage() {
     <Container className="flex items-center justify-center min-h-[calc(100vh-140px)] py-20">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-extrabold text-primary">Join Octagon AI</CardTitle>
+          <CardTitle className="text-3xl font-extrabold text-primary">Join CageMind AI</CardTitle>
           <CardDescription>Create an account to access premium features.</CardDescription>
         </CardHeader>
         <CardContent>

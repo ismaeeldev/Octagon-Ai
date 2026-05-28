@@ -14,21 +14,29 @@ export class Scheduler {
       manager.register(new UfcEventScraper(false));
       await manager.runAllSequentially();
 
-      const upcomingEvents = await prisma.event.findMany({
-        where: { isUpcoming: true },
+      const eventsToSync = await prisma.event.findMany({
+        where: {
+          OR: [
+            { isUpcoming: true },
+            {
+              isUpcoming: false,
+              fights: { none: {} }
+            }
+          ]
+        },
         orderBy: { date: 'asc' },
-        take: 3
+        take: 5
       });
 
       const fightCardManager = new ScraperManager();
-      for (const event of upcomingEvents) {
+      for (const event of eventsToSync) {
         const match = event.name.match(/UFC\s(\d+)/i);
         const urlSlug = match ? `ufc-${match[1]}` : event.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
         const eventUrl = `https://www.ufc.com/event/${urlSlug}`;
         fightCardManager.register(new FightCardScraper(eventUrl, event.id, false));
       }
       
-      if (upcomingEvents.length > 0) {
+      if (eventsToSync.length > 0) {
         await fightCardManager.runAllSequentially();
       }
       logger.info("[Jobs] Sync Events completed.");

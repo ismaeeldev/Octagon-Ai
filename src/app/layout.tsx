@@ -12,24 +12,24 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://octagon.ai"),
-  title: "Octagon AI | UFC & MMA Analytics Platform",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://cagemind.ai"),
+  title: "CageMind AI | UFC & MMA Analytics Platform",
   description: "Leverage automated data, live fight odds, and AI-driven prediction models to gain an edge.",
-  keywords: ["UFC", "MMA", "AI Predictions", "Fight Odds", "Sports Betting", "Octagon AI"],
+  keywords: ["UFC", "MMA", "AI Predictions", "Fight Odds", "Sports Betting", "CageMind AI"],
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "Octagon AI | Predictive MMA Analytics",
+    title: "CageMind AI | Predictive MMA Analytics",
     description: "The world's most advanced AI prediction engine for MMA.",
-    url: "https://octagon.ai",
-    siteName: "Octagon AI",
+    url: "https://cagemind.ai",
+    siteName: "CageMind AI",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Octagon AI Dashboard",
+        alt: "CageMind AI Dashboard",
       }
     ],
     locale: "en_US",
@@ -37,13 +37,18 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Octagon AI",
+    title: "CageMind AI",
     description: "AI-driven UFC predictions and analytics.",
     images: ["/og-image.png"],
   },
   robots: {
     index: true,
     follow: true,
+  },
+  icons: {
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
   }
 };
 

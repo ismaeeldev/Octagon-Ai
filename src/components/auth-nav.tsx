@@ -50,12 +50,6 @@ export function AuthNav() {
             <div className="px-2 space-y-1">
               <Link href="/dashboard" onClick={() => setIsOpen(false)}>
                 <div className="flex items-center gap-3 px-3 py-2 text-sm rounded-lg hover:bg-muted transition-colors cursor-pointer text-foreground/80 hover:text-foreground">
-                  <LayoutDashboard className="w-4 h-4" />
-                  Dashboard
-                </div>
-              </Link>
-              <Link href="/settings/billing" onClick={() => setIsOpen(false)}>
-                <div className="flex items-center gap-3 px-3 py-2 text-sm rounded-lg hover:bg-muted transition-colors cursor-pointer text-foreground/80 hover:text-foreground">
                   <Settings className="w-4 h-4" />
                   Account Settings
                 </div>
