@@ -78,6 +78,7 @@ async function FighterList({ query, page }: { query: string; page: number }) {
                     <img
                       src={fighter.imageUrl}
                       alt={displayName}
+                      referrerPolicy="no-referrer"
                       className="h-[95%] object-contain transition-transform duration-500 group-hover:scale-108 group-hover:-translate-y-1 select-none z-10 filter drop-shadow-[0_5px_10px_rgba(0,0,0,0.5)]"
                       loading="lazy"
                     />

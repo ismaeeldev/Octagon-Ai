@@ -130,6 +130,7 @@ export function EventCard({ event }: { event: any }) {
                 <img
                   src={f1Img || "/fallback_image.png"}
                   alt={f1?.name || "Fighter 1"}
+                  referrerPolicy="no-referrer"
                   className="h-[150px] object-contain select-none filter drop-shadow-[0_5px_10px_rgba(0,0,0,0.6)] transition-opacity duration-500"
                   onError={(e) => { (e.target as HTMLImageElement).src = '/fallback_image.png'; }}
                 />
@@ -150,6 +151,7 @@ export function EventCard({ event }: { event: any }) {
                 <img
                   src={f2Img || "/fallback_image.png"}
                   alt={f2?.name || "Fighter 2"}
+                  referrerPolicy="no-referrer"
                   className="h-[150px] object-contain select-none filter drop-shadow-[0_5px_10px_rgba(0,0,0,0.6)] transition-opacity duration-500"
                   onError={(e) => { (e.target as HTMLImageElement).src = '/fallback_image.png'; }}
                 />

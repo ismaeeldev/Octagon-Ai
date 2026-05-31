@@ -66,6 +66,7 @@ function FighterAvatar({ src, name }: { src?: string | null; name: string }) {
         <img
           src={src}
           alt={displayName}
+          referrerPolicy="no-referrer"
           className={`h-full w-full object-contain filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
           onLoad={() => setLoaded(true)}
           onError={() => setError(true)}

@@ -34,8 +34,9 @@ export class UfcEventValidator {
     }
 
     // Determine if upcoming by comparing the event date with the current time
-    // We add a 24-hour buffer so that events currently happening today are still considered upcoming
-    const isUpcoming = parsedDate.getTime() > Date.now() - 24 * 60 * 60 * 1000;
+    // We add a 3-hour buffer so events currently in progress are still considered upcoming
+    // (24h was too long — caused yesterday's events to stay "upcoming" the next morning)
+    const isUpcoming = parsedDate.getTime() > Date.now() - 3 * 60 * 60 * 1000;
 
     return {
       name,

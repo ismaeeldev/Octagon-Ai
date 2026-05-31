@@ -50,6 +50,7 @@ export default async function FighterDetailPage(props: {
                 <img
                   src={fighter.imageUrl}
                   alt={displayName}
+                  referrerPolicy="no-referrer"
                   className="h-[95%] object-contain select-none z-10 filter drop-shadow-[0_5px_15px_rgba(0,0,0,0.6)]"
                 />
               ) : (

@@ -7,6 +7,8 @@ const envSchema = z.object({
   STRIPE_SECRET_KEY: z.string().min(1, "STRIPE_SECRET_KEY is required"),
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().min(1, "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is required"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  NEXTAUTH_URL: z.string().url("NEXTAUTH_URL must be a valid URL").optional(),
+  NEXT_PUBLIC_APP_URL: z.string().url("NEXT_PUBLIC_APP_URL must be a valid URL").optional(),
 });
 
 const _env = envSchema.safeParse(process.env);

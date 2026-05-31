@@ -22,11 +22,15 @@ export async function GET(req: Request) {
     const take = 10;
     const skip = (page - 1) * take;
 
+    // Start of today UTC so past events don't appear in predictions
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+
     // 1. On-demand AI prediction generation for unpredicted fights of UPCOMING events ONLY
     const unpredictedFights = await prisma.fight.findMany({
       where: {
         aiPrediction: null,
-        event: { isUpcoming: true }
+        event: { isUpcoming: true, date: { gte: todayStart } }
       },
       include: {
         fighter1: true,
@@ -74,7 +78,7 @@ export async function GET(req: Request) {
     // 2. Fetch predicted fights (strictly UPCOMING events ONLY)
     const where: Prisma.FightWhereInput = {
       aiPrediction: { not: null },
-      event: { isUpcoming: true }
+      event: { isUpcoming: true, date: { gte: todayStart } }
     };
 
     if (search) {

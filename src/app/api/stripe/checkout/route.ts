@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/db";
 import { NextRequest } from "next/server";
+import { getBaseUrl } from "@/lib/utils";
 
 export async function POST(req: NextRequest) {
   try {
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+    const baseUrl = getBaseUrl();
 
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest) {
               name: "CageMind AI Premium Subscription",
               description: "Access to AI fight predictions, matchup simulator, and premium analytics",
             },
-            unit_amount: 100, // $1.00 USD (in cents)
+            unit_amount: 2499, // $24.99 USD (in cents)
             recurring: {
               interval: "month",
             },

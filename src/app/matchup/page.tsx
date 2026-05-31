@@ -249,6 +249,7 @@ export default function MatchupPage() {
                   <img
                     src={f1Details.imageUrl || "/fallback_image.png"}
                     alt={f1Details.name}
+                    referrerPolicy="no-referrer"
                     className={`h-full object-contain filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.8)] transition-all duration-500 hover:scale-105 select-none ${img1Loading ? 'opacity-0' : 'opacity-100'}`}
                     onLoad={() => setImg1Loading(false)}
                     onError={(e) => {
@@ -278,6 +279,7 @@ export default function MatchupPage() {
                   <img
                     src={f2Details.imageUrl || "/fallback_image.png"}
                     alt={f2Details.name}
+                    referrerPolicy="no-referrer"
                     className={`h-full object-contain filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.8)] transition-all duration-500 hover:scale-105 select-none ${img2Loading ? 'opacity-0' : 'opacity-100'}`}
                     onLoad={() => setImg2Loading(false)}
                     onError={(e) => {

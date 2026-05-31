@@ -47,7 +47,7 @@ If you find any bugs or have feedback, please take a screenshot and note which s
 
 ## 6. Upgrading via Stripe (Pricing)
 **Goal:** Verify the checkout process works.
-1. On the Pricing page, find the **Premium Tier** ($19.99/mo).
+1. On the Pricing page, find the **Premium Tier** ($24.99/mo).
 2. Click **"Subscribe Now"**.
 3. You will be redirected to the secure Stripe Checkout page.
 4. Enter the Stripe Test Credit Card: `4242 4242 4242 4242` with any future expiration date (e.g., `12/30`) and any 3-digit CVC (e.g., `123`).

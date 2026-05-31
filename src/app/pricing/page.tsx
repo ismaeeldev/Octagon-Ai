@@ -83,7 +83,7 @@ export default async function PricingPage() {
           <CardHeader className="bg-muted/10 pb-8 relative z-10">
             <CardTitle className="text-2xl font-black uppercase tracking-tight text-premium">Premium</CardTitle>
             <CardDescription className="text-base mt-2">The ultimate toolkit for serious bettors.</CardDescription>
-            <div className="mt-6 font-mono text-4xl font-black text-foreground">$1<span className="text-lg text-muted-foreground font-sans font-medium">/mo</span></div>
+            <div className="mt-6 font-mono text-4xl font-black text-foreground">$24.99<span className="text-lg text-muted-foreground font-sans font-medium">/mo</span></div>
           </CardHeader>
           <CardContent className="pt-8 flex-1 relative z-10">
             <ul className="space-y-4">

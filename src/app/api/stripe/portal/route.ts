@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/db";
+import { getBaseUrl } from "@/lib/utils";
 
 export async function POST() {
   try {
@@ -20,7 +21,7 @@ export async function POST() {
       return new NextResponse("No active subscription", { status: 400 });
     }
 
-    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+    const baseUrl = getBaseUrl();
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: subscription.stripeCustomerId,

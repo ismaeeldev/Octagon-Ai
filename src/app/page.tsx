@@ -4,8 +4,212 @@ import { Container } from "@/components/layout/container"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { prisma } from "@/lib/db"
+import { format } from "date-fns"
+import { Calendar } from "lucide-react"
+import { FightCardScraper } from "@/scrapers/fight-card-scraper"
+import { scrapeAndSaveFighter } from "@/lib/fighter-scraper"
+import { FighterAvatar } from "@/components/ui/fighter-avatar"
 
-export default function HomePage() {
+export const revalidate = 0; // Fresh DB query on page visit
+
+function generateEventSlug(eventName: string): string {
+  const numberedMatch = eventName.match(/UFC\s+(\d+)/i);
+  if (numberedMatch) {
+    return `ufc-${numberedMatch[1]}`;
+  }
+
+  const ufcNamedMatch = eventName.match(/^UFC\s+(.+)/i);
+  if (ufcNamedMatch) {
+    return `ufc-${ufcNamedMatch[1].toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, '')}`;
+  }
+
+  const vsMatch = eventName.match(/(.+?)\s+vs\.?\s+(.+)/i);
+  if (vsMatch) {
+    const f1Last = vsMatch[1].trim().split(/\s+/).pop()?.toLowerCase() || '';
+    const f2Last = vsMatch[2].trim().split(/\s+/).pop()?.toLowerCase() || '';
+    return `ufc-fight-night-${f1Last}-vs-${f2Last}`;
+  }
+
+  return eventName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, '');
+}
+
+export default async function HomePage() {
+  // Start of today in UTC — ensures past events never surface as "upcoming"
+  const todayStart = new Date();
+  todayStart.setUTCHours(0, 0, 0, 0);
+
+  // Query the database for the most recent upcoming event
+  let upcomingEvent = await prisma.event.findFirst({
+    where: { isUpcoming: true, date: { gte: todayStart } },
+    orderBy: { date: "asc" },
+    include: {
+      fights: {
+        include: {
+          fighter1: true,
+          fighter2: true,
+        },
+        orderBy: { isTitleFight: "desc" },
+        take: 1,
+      },
+    },
+  });
+
+  // Dynamic on-demand scraper trigger if the event exists but has 0 fights
+  if (upcomingEvent && upcomingEvent.fights.length === 0) {
+    try {
+      const urlSlug = generateEventSlug(upcomingEvent.name);
+      const eventUrl = `https://www.ufc.com/event/${urlSlug}`;
+      const scraper = new FightCardScraper(eventUrl, upcomingEvent.id, false);
+      await scraper.run();
+      
+      // Re-fetch fights
+      const refreshedFights = await prisma.fight.findMany({
+        where: { eventId: upcomingEvent.id },
+        include: {
+          fighter1: true,
+          fighter2: true,
+        },
+        orderBy: { isTitleFight: "desc" },
+      });
+
+      if (refreshedFights.length > 0) {
+        // Scrape main fighter images if they are missing
+        const mainFight = refreshedFights[0];
+        const promises = [];
+        if (!mainFight.fighter1.imageUrl || mainFight.fighter1.imageUrl === "null" || mainFight.fighter1.imageUrl === "undefined") {
+          promises.push(scrapeAndSaveFighter(mainFight.fighter1Id).catch(() => null));
+        }
+        if (!mainFight.fighter2.imageUrl || mainFight.fighter2.imageUrl === "null" || mainFight.fighter2.imageUrl === "undefined") {
+          promises.push(scrapeAndSaveFighter(mainFight.fighter2Id).catch(() => null));
+        }
+        if (promises.length > 0) {
+          await Promise.all(promises);
+        }
+        
+        // Final update to upcomingEvent
+        upcomingEvent = await prisma.event.findFirst({
+          where: { id: upcomingEvent.id },
+          include: {
+            fights: {
+              include: {
+                fighter1: true,
+                fighter2: true,
+              },
+              orderBy: { isTitleFight: "desc" },
+              take: 1,
+            },
+          },
+        }) || upcomingEvent;
+      }
+    } catch (err) {
+      console.error("Homepage on-demand scrape failed:", err);
+    }
+  }
+
+  const featuredFight = upcomingEvent?.fights?.[0] || null;
+
+  // Helper for names parsing
+  const getFighterNames = (fullName: string) => {
+    const parts = fullName.split(" ");
+    const last = parts.pop() || fullName;
+    const first = parts.join(" ") || "";
+    return { first, last };
+  };
+
+  // Parsing names with dynamic fallbacks to event title
+  let f1LastName = "Fighter A";
+  let f2LastName = "Fighter B";
+  let f1FirstName = "";
+  let f2FirstName = "";
+
+  if (featuredFight) {
+    const f1Names = getFighterNames(featuredFight.fighter1.name);
+    const f2Names = getFighterNames(featuredFight.fighter2.name);
+    f1FirstName = f1Names.first;
+    f1LastName = f1Names.last;
+    f2FirstName = f2Names.first;
+    f2LastName = f2Names.last;
+  } else if (upcomingEvent) {
+    const match = upcomingEvent.name.match(/(?:UFC\s+\d+\s*:\s*)?(.+?)\s+vs\.?\s+(.+)/i);
+    if (match) {
+      f1LastName = match[1].trim().split(" ").pop() || match[1];
+      f2LastName = match[2].trim().split(" ").pop() || match[2];
+      f1LastName = f1LastName.replace(/[^a-zA-Z]/g, "");
+      f2LastName = f2LastName.replace(/[^a-zA-Z]/g, "");
+    }
+  }
+
+  // Load fighter profiles from database using parsed name strings if featuredFight was null
+  let dbF1 = featuredFight?.fighter1 || null;
+  let dbF2 = featuredFight?.fighter2 || null;
+
+  if (!dbF1 && upcomingEvent && f1LastName !== "Fighter A") {
+    dbF1 = await prisma.fighter.findFirst({
+      where: { name: { contains: f1LastName, mode: "insensitive" } }
+    });
+  }
+  if (!dbF2 && upcomingEvent && f2LastName !== "Fighter B") {
+    dbF2 = await prisma.fighter.findFirst({
+      where: { name: { contains: f2LastName, mode: "insensitive" } }
+    });
+  }
+
+  let eloF1 = 1500;
+  let eloF2 = 1500;
+
+  if (dbF1) {
+    const names = getFighterNames(dbF1.name);
+    f1FirstName = names.first;
+    f1LastName = names.last;
+    eloF1 = dbF1.eloRating;
+  }
+  if (dbF2) {
+    const names = getFighterNames(dbF2.name);
+    f2FirstName = names.first;
+    f2LastName = names.last;
+    eloF2 = dbF2.eloRating;
+  }
+
+  // Calculate Win Probability & Edge
+  const getImpliedProbability = (odds: number | null): number => {
+    if (!odds) return 50;
+    return odds > 0 ? (100 / (odds + 100)) * 100 : (Math.abs(odds) / (Math.abs(odds) + 100)) * 100;
+  };
+
+  const getProbabilities = (summary: string | null, f1Name: string, f1Elo: number, f2Elo: number) => {
+    if (summary) {
+      const match = summary.match(/(\d+\.\d+)%/);
+      if (match) {
+        const prob = parseFloat(match[1]);
+        if (summary.includes(`${f1Name} is favored`)) {
+          return { f1Prob: prob, f2Prob: 100 - prob };
+        } else {
+          return { f1Prob: 100 - prob, f2Prob: prob };
+        }
+      }
+    }
+    const eloDiff = f1Elo - f2Elo;
+    const probF1 = 1 / (1 + Math.exp(-eloDiff / 250));
+    return { f1Prob: Math.round(probF1 * 100), f2Prob: Math.round((1 - probF1) * 100) };
+  };
+
+  const probs = getProbabilities(
+    featuredFight?.aiPrediction || null,
+    dbF1?.name || "Fighter 1",
+    eloF1,
+    eloF2
+  );
+
+  const impliedProb1 = getImpliedProbability(featuredFight?.oddsFighter1 || null);
+  const impliedProb2 = getImpliedProbability(featuredFight?.oddsFighter2 || null);
+
+  const edgeF1 = probs.f1Prob - impliedProb1;
+  const edgeF2 = probs.f2Prob - impliedProb2;
+  const bestEdge = edgeF1 > edgeF2 
+    ? { name: f1LastName, val: edgeF1 } 
+    : { name: f2LastName, val: edgeF2 };
+
   return (
     <div className="flex flex-col w-full pb-20">
       {/* Hero Section */}
@@ -47,99 +251,138 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="mx-auto max-w-4xl">
-            <Card className="glass-panel overflow-hidden border border-border/30 p-1 rounded-[2rem] shadow-2xl relative">
-              <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent opacity-50 pointer-events-none"></div>
-              <div className="bg-card/60 backdrop-blur-md rounded-[1.8rem] overflow-hidden relative z-10">
-                <CardHeader className="bg-black/40 border-b border-white/5 pb-8 pt-8">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="relative flex items-center justify-center">
-                        <div className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-20"></div>
-                        <Badge variant="destructive" className="uppercase font-black tracking-widest bg-red-600 hover:bg-red-600 text-[10px] py-1 px-3 shadow-[0_0_15px_rgba(220,38,38,0.5)] border-0">
-                          <span className="w-1.5 h-1.5 rounded-full bg-white mr-2 animate-pulse"></span>Live Odds
+          <div className="mx-auto max-w-4xl animate-in fade-in slide-in-from-bottom-6 duration-700">
+            {!upcomingEvent ? (
+              // NO UPCOMING EVENTS RENDER
+              <Card className="glass-panel overflow-hidden border border-border/30 p-8 rounded-[2rem] shadow-2xl text-center flex flex-col items-center justify-center min-h-[300px]">
+                <div className="w-16 h-16 bg-muted/40 rounded-full flex items-center justify-center text-muted-foreground mb-4 border border-zinc-800">
+                  <Calendar className="w-8 h-8" />
+                </div>
+                <h3 className="text-2xl font-black uppercase text-white tracking-tight mb-2">No Upcoming Events</h3>
+                <p className="text-zinc-400 text-sm max-w-md">
+                  There are currently no upcoming UFC events scheduled or synced in the database. Check back soon for the latest predictions!
+                </p>
+              </Card>
+            ) : (
+              // DYNAMIC EVENT CARD
+              <Card className="glass-panel overflow-hidden border border-border/30 p-1 rounded-[2rem] shadow-2xl relative">
+                <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent opacity-50 pointer-events-none"></div>
+                <div className="bg-card/60 backdrop-blur-md rounded-[1.8rem] overflow-hidden relative z-10">
+                  <CardHeader className="bg-black/40 border-b border-white/5 pb-8 pt-8">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="relative flex items-center justify-center">
+                          <div className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-20"></div>
+                          <Badge variant="destructive" className="uppercase font-black tracking-widest bg-red-600 hover:bg-red-600 text-[10px] py-1 px-3 shadow-[0_0_15px_rgba(220,38,38,0.5)] border-0">
+                            <span className="w-1.5 h-1.5 rounded-full bg-white mr-2 animate-pulse"></span>Live Odds
+                          </Badge>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-xs font-medium text-muted-foreground border-white/10 bg-white/5 backdrop-blur-sm">
+                        {format(new Date(upcomingEvent.date), "MMMM do, yyyy")} • {upcomingEvent.location || "TBD"}
+                      </Badge>
+                    </div>
+                    <CardTitle className="text-4xl md:text-5xl font-black uppercase text-center mt-2 tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70 px-4">
+                      {f1LastName} <span className="text-primary/80 mx-2 text-3xl">VS</span> {f2LastName}
+                    </CardTitle>
+                    <CardDescription className="text-center text-primary/90 font-bold mt-3 tracking-widest uppercase text-sm">
+                      {upcomingEvent.name} {featuredFight?.weightClass ? `- ${featuredFight.weightClass}` : ""}
+                    </CardDescription>
+                  </CardHeader>
+
+                  <CardContent className="p-0">
+                    <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 divide-white/5 bg-gradient-to-b from-black/20 to-transparent relative min-h-[220px]">
+                      {/* Fighter 1 */}
+                      <div className="p-8 md:p-10 text-center flex flex-col items-center justify-center relative overflow-hidden group">
+                        <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+                        
+                        <FighterAvatar 
+                          src={dbF1?.imageUrl} 
+                          name={dbF1?.name || f1LastName} 
+                          sizeClassName="w-20 h-20 mb-3" 
+                        />
+                        
+                        <h3 className="font-black text-3xl mb-1 tracking-tight">{f1FirstName}</h3>
+                        <h4 className="font-bold text-xl text-muted-foreground mb-6 uppercase tracking-wider">{f1LastName}</h4>
+                        <Badge variant="outline" className="mb-6 uppercase tracking-widest font-black text-blue-400 border-blue-400/30 bg-blue-400/5">
+                          Elo: {eloF1}
                         </Badge>
-                      </div>
-                    </div>
-                    <Badge variant="outline" className="text-xs font-medium text-muted-foreground border-white/10 bg-white/5 backdrop-blur-sm">
-                      July 10, 2026 • Las Vegas, NV
-                    </Badge>
-                  </div>
-                  <CardTitle className="text-4xl md:text-5xl font-black uppercase text-center mt-2 tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70">
-                    Makhachev <span className="text-primary/80 mx-2 text-3xl">VS</span> Tsarukyan
-                  </CardTitle>
-                  <CardDescription className="text-center text-primary/90 font-bold mt-3 tracking-widest uppercase text-sm">
-                    UFC 320 - Lightweight Championship
-                  </CardDescription>
-                </CardHeader>
 
-                <CardContent className="p-0">
-                  <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 divide-white/5 bg-gradient-to-b from-black/20 to-transparent">
-                    {/* Fighter 1 */}
-                    <div className="p-8 md:p-10 text-center flex flex-col items-center justify-center relative overflow-hidden group">
-                      <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-                      <h3 className="font-black text-3xl mb-1 tracking-tight">Islam</h3>
-                      <h4 className="font-bold text-xl text-muted-foreground mb-6 uppercase tracking-wider">Makhachev</h4>
-                      <Badge variant="outline" className="mb-6 uppercase tracking-widest font-black text-blue-400 border-blue-400/30 bg-blue-400/5">Champion</Badge>
-
-                      <div className="bg-black/40 border border-white/10 w-full py-4 rounded-2xl relative shadow-inner group-hover:border-blue-500/30 transition-colors">
-                        <div className="absolute inset-0 bg-blue-500/5 rounded-2xl"></div>
-                        <span className="relative font-mono text-4xl font-black text-white">-250</span>
-                      </div>
-                      <p className="text-xs uppercase tracking-widest text-muted-foreground mt-4 font-bold">
-                        Win Prob: <span className="text-blue-400 text-sm">72%</span>
-                      </p>
-                    </div>
-
-                    {/* Center Info */}
-                    <div className="p-8 text-center flex flex-col items-center justify-center bg-black/40 relative min-h-[200px] border-x border-white/5">
-                      <Badge variant="outline" className="mb-auto border-white/10 bg-white/5 uppercase tracking-widest text-[10px]">5 Rounds</Badge>
-
-                      <div className="w-full mt-auto mb-auto space-y-3">
-                        <div className="inline-flex items-center justify-center p-3 rounded-full bg-primary/10 border border-primary/20 mb-2 shadow-[0_0_20px_rgba(210,40,40,0.15)]">
-                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                        <div className="bg-black/40 border border-white/10 w-full py-4 rounded-2xl relative shadow-inner group-hover:border-blue-500/30 transition-colors">
+                          <div className="absolute inset-0 bg-blue-500/5 rounded-2xl"></div>
+                          <span className="relative font-mono text-4xl font-black text-white">
+                            {featuredFight?.oddsFighter1 ? `${featuredFight.oddsFighter1 > 0 ? '+' : ''}${featuredFight.oddsFighter1}` : "TBD"}
+                          </span>
                         </div>
-                        <p className="text-[10px] uppercase tracking-widest font-black text-muted-foreground">AI Edge Unlock</p>
-                        <div className="bg-gradient-to-r from-primary/20 via-primary/30 to-primary/20 text-white py-3 px-4 rounded-xl text-sm font-black border border-primary/40 shadow-[0_0_20px_rgba(210,40,40,0.3)] backdrop-blur-md">
-                          Over 2.5 Rounds
+                        <p className="text-xs uppercase tracking-widest text-muted-foreground mt-4 font-bold">
+                          Win Prob: <span className="text-blue-400 text-sm">{probs.f1Prob.toFixed(0)}%</span>
+                        </p>
+                      </div>
+
+                      {/* Center Info */}
+                      <div className="p-8 text-center flex flex-col items-center justify-center bg-black/40 relative min-h-[200px] border-x border-white/5">
+                        <Badge variant="outline" className="mb-auto border-white/10 bg-white/5 uppercase tracking-widest text-[10px]">
+                          {featuredFight?.rounds || 3} Rounds
+                        </Badge>
+
+                        <div className="w-full mt-auto mb-auto space-y-3">
+                          <div className="inline-flex items-center justify-center p-3 rounded-full bg-primary/10 border border-primary/20 mb-2 shadow-[0_0_20px_rgba(210,40,40,0.15)]">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                          </div>
+                          <p className="text-[10px] uppercase tracking-widest font-black text-muted-foreground">AI Edge Unlock</p>
+                          <div className="bg-gradient-to-r from-primary/20 via-primary/30 to-primary/20 text-white py-3 px-4 rounded-xl text-sm font-black border border-primary/40 shadow-[0_0_20px_rgba(210,40,40,0.3)] backdrop-blur-md">
+                            {bestEdge.val > 0 ? `+${bestEdge.val.toFixed(0)}% Edge on ${bestEdge.name}` : "Over 1.5 Rounds"}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Fighter 2 */}
-                    <div className="p-8 md:p-10 text-center flex flex-col items-center justify-center relative overflow-hidden group">
-                      <div className="absolute inset-0 bg-gradient-to-tl from-red-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-                      <h3 className="font-black text-3xl mb-1 tracking-tight">Arman</h3>
-                      <h4 className="font-bold text-xl text-muted-foreground mb-6 uppercase tracking-wider">Tsarukyan</h4>
-                      <Badge variant="outline" className="mb-6 uppercase tracking-widest font-black text-red-400 border-red-400/30 bg-red-400/5">Challenger</Badge>
+                      {/* Fighter 2 */}
+                      <div className="p-8 md:p-10 text-center flex flex-col items-center justify-center relative overflow-hidden group">
+                        <div className="absolute inset-0 bg-gradient-to-tl from-red-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+                        
+                        <FighterAvatar 
+                          src={dbF2?.imageUrl} 
+                          name={dbF2?.name || f2LastName} 
+                          sizeClassName="w-20 h-20 mb-3" 
+                        />
 
-                      <div className="bg-black/40 border border-white/10 w-full py-4 rounded-2xl relative shadow-inner group-hover:border-red-500/30 transition-colors">
-                        <div className="absolute inset-0 bg-red-500/5 rounded-2xl"></div>
-                        <span className="relative font-mono text-4xl font-black text-white">+190</span>
+                        <h3 className="font-black text-3xl mb-1 tracking-tight">{f2FirstName}</h3>
+                        <h4 className="font-bold text-xl text-muted-foreground mb-6 uppercase tracking-wider">{f2LastName}</h4>
+                        <Badge variant="outline" className="mb-6 uppercase tracking-widest font-black text-red-400 border-red-400/30 bg-red-400/5">
+                          Elo: {eloF2}
+                        </Badge>
+
+                        <div className="bg-black/40 border border-white/10 w-full py-4 rounded-2xl relative shadow-inner group-hover:border-red-500/30 transition-colors">
+                          <div className="absolute inset-0 bg-red-500/5 rounded-2xl"></div>
+                          <span className="relative font-mono text-4xl font-black text-white">
+                            {featuredFight?.oddsFighter2 ? `${featuredFight.oddsFighter2 > 0 ? '+' : ''}${featuredFight.oddsFighter2}` : "TBD"}
+                          </span>
+                        </div>
+                        <p className="text-xs uppercase tracking-widest text-muted-foreground mt-4 font-bold">
+                          Win Prob: <span className="text-red-400 text-sm">{probs.f2Prob.toFixed(0)}%</span>
+                        </p>
                       </div>
-                      <p className="text-xs uppercase tracking-widest text-muted-foreground mt-4 font-bold">
-                        Win Prob: <span className="text-red-400 text-sm">28%</span>
-                      </p>
                     </div>
-                  </div>
-                </CardContent>
+                  </CardContent>
 
-                <CardFooter className="bg-black/60 border-t border-white/5 p-6 flex flex-col md:flex-row justify-between items-center gap-6">
-                  <div className="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-full border border-white/10">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                    </span>
-                    <span className="text-xs font-bold text-muted-foreground tracking-wide uppercase">Vegas Odds Syncing</span>
-                  </div>
-                  <Link href="/pricing" className="w-full md:w-auto">
-                    <Button variant="premium" size="lg" className="w-full md:w-auto cursor-pointer rounded-xl font-black tracking-wide shadow-[0_0_20px_rgba(202,138,4,0.3)] hover:shadow-[0_0_30px_rgba(202,138,4,0.5)] transition-shadow">
-                      Unlock Full Card Predictions
-                    </Button>
-                  </Link>
-                </CardFooter>
-              </div>
-            </Card>
+                  <CardHeader className="p-0 border-0" />
+                  <CardFooter className="bg-black/60 border-t border-white/5 p-6 flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div className="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-full border border-white/10">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                      </span>
+                      <span className="text-xs font-bold text-muted-foreground tracking-wide uppercase">Vegas Odds Syncing</span>
+                    </div>
+                    <Link href={`/events/${upcomingEvent.id}`} className="w-full md:w-auto">
+                      <Button variant="premium" size="lg" className="w-full md:w-auto cursor-pointer rounded-xl font-black tracking-wide shadow-[0_0_20px_rgba(202,138,4,0.3)] hover:shadow-[0_0_30px_rgba(202,138,4,0.5)] transition-shadow">
+                        Unlock Full Card Predictions
+                      </Button>
+                    </Link>
+                  </CardFooter>
+                </div>
+              </Card>
+            )}
           </div>
         </Container>
       </section>
